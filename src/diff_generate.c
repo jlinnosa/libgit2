@@ -1037,7 +1037,11 @@ static int handle_unmatched_new_item(
 			(delta_type == GIT_DELTA_UNTRACKED &&
 			 DIFF_FLAG_IS_SET(diff, GIT_DIFF_RECURSE_UNTRACKED_DIRS)) ||
 			(delta_type == GIT_DELTA_IGNORED &&
-			 DIFF_FLAG_IS_SET(diff, GIT_DIFF_RECURSE_IGNORED_DIRS));
+			 DIFF_FLAG_IS_SET(diff, GIT_DIFF_RECURSE_IGNORED_DIRS)) ||
+      (delta_type == GIT_DELTA_UNTRACKED &&
+			 info->new_iter->type == GIT_ITERATOR_TYPE_WORKDIR &&
+       info->new_iter->start && *info->new_iter->start &&
+       info->new_iter->prefixcomp(nitem->path, info->new_iter->start) < 0);
 
 		/* do not advance into directories that contain a .git file */
 		if (recurse_into_dir && !contains_oitem) {
