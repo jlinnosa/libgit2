@@ -73,6 +73,7 @@ static int diff_insert_delta(
 	int error = 0;
 
 	if (diff->base.opts.notify_cb) {
+    fprintf(stderr, "diff_insert_delta 1 %d\n", delta->status);
 		error = diff->base.opts.notify_cb(
 			&diff->base, delta, matched_pathspec, diff->base.opts.payload);
 
@@ -185,10 +186,15 @@ static int diff_delta__from_one(
 		has_old = true;
 	}
 
+  fprintf(stderr, "diff_delta__from_one 1 %s %d\n", entry->path, status);
+
 	if (DIFF_FLAG_IS_SET(diff, GIT_DIFF_REVERSE))
 		has_old = !has_old;
 
-  if (!diff_delta__test(diff, status, entry, &matched_pathspec)) return 0;
+  if (!diff_delta__test(diff, status, entry, &matched_pathspec)) {
+    fprintf(stderr, "diff_delta__from_one 2\n");
+    return 0;
+  }
 
   delta = diff_delta__alloc(diff, status, entry->path);
 	GIT_ERROR_CHECK_ALLOC(delta);
@@ -216,6 +222,7 @@ static int diff_delta__from_one(
 	if (has_old || !git_oid_iszero(&delta->new_file.id))
 		delta->new_file.flags |= GIT_DIFF_FLAG_VALID_ID;
 
+  fprintf(stderr, "diff_delta__from_one 3\n");
 	return diff_insert_delta(diff, delta, matched_pathspec);
 }
 
@@ -985,8 +992,12 @@ static int handle_unmatched_new_item(
 	git_delta_t delta_type = GIT_DELTA_UNTRACKED;
 	bool contains_oitem;
 
+  fprintf(stderr, "handle_unmatched_new_item 1 %s %s %d %x\n", info->oitem ? info->oitem->path : "null", nitem->path, nitem->mode, diff->base.opts.flags);
+
 	/* check if this is a prefix of the other side */
 	contains_oitem = entry_is_prefixed(diff, info->oitem, nitem);
+
+  fprintf(stderr, "handle_unmatched_new_item 2 %d\n", contains_oitem);
 
 	/* update delta_type if this item is conflicted */
 	if (git_index_entry_is_conflict(nitem))
@@ -998,6 +1009,8 @@ static int handle_unmatched_new_item(
   else if (!(nitem->mode == GIT_FILEMODE_TREE && contains_oitem) &&
            git_iterator_current_is_ignored(info->new_iter))
     delta_type = GIT_DELTA_IGNORED;
+
+  fprintf(stderr, "handle_unmatched_new_item 3 %d\n", delta_type);
 
 	if (nitem->mode == GIT_FILEMODE_TREE) {
 		bool recurse_into_dir = contains_oitem ||
@@ -1012,6 +1025,7 @@ static int handle_unmatched_new_item(
 			if (git_iterator_current_workdir_path(&full, info->new_iter) < 0)
 				return -1;
 			if (full && git_path_contains(full, DOT_GIT)) {
+        fprintf(stderr, "handle_unmatched_new_item 4\n");
 				/* TODO: warning if not a valid git repository */
 				recurse_into_dir = false;
 			}
@@ -1027,8 +1041,12 @@ static int handle_unmatched_new_item(
 			git_iterator_status_t untracked_state;
       git_index_entry entry;
 
-      if (!diff_delta__test(diff, delta_type, nitem, NULL))
+      fprintf(stderr, "handle_unmatched_new_item 5\n");
+
+      if (!diff_delta__test(diff, delta_type, nitem, NULL)) {
+        fprintf(stderr, "handle_unmatched_new_item 6\n");
 				return iterator_advance(&info->nitem, info->new_iter);
+      }
 
       entry = *nitem;
 
@@ -1040,21 +1058,26 @@ static int handle_unmatched_new_item(
 			/* if we found nothing or just ignored items, update the record */
 			if (untracked_state == GIT_ITERATOR_STATUS_IGNORED ||
 				untracked_state == GIT_ITERATOR_STATUS_EMPTY) {
+        fprintf(stderr, "handle_unmatched_new_item 7 %d\n", untracked_state);
 				delta_type = GIT_DELTA_IGNORED;
 
 				if (DIFF_FLAG_ISNT_SET(diff, GIT_DIFF_INCLUDE_IGNORED))
 					return 0;
 			}
 
+      fprintf(stderr, "handle_unmatched_new_item 8\n");
 			return diff_delta__from_one(diff, delta_type, NULL, &entry);
 		}
 
+    fprintf(stderr, "handle_unmatched_new_item 9\n");
 		/* try to advance into directory if necessary */
 		if (recurse_into_dir) {
+      fprintf(stderr, "handle_unmatched_new_item 10\n");
 			error = iterator_advance_into(&info->nitem, info->new_iter);
 
 			/* if directory is empty, can't advance into it, so skip it */
 			if (error == GIT_ENOTFOUND) {
+        fprintf(stderr, "handle_unmatched_new_item 11\n");
 				git_error_clear();
 				error = iterator_advance(&info->nitem, info->new_iter);
 			}
@@ -1065,27 +1088,34 @@ static int handle_unmatched_new_item(
 
 	else if (delta_type == GIT_DELTA_IGNORED &&
 		DIFF_FLAG_ISNT_SET(diff, GIT_DIFF_RECURSE_IGNORED_DIRS) &&
-		git_iterator_current_tree_is_ignored(info->new_iter))
+		git_iterator_current_tree_is_ignored(info->new_iter)) {
+      fprintf(stderr, "handle_unmatched_new_item 12\n");
 		/* item contained in ignored directory, so skip over it */
 		return iterator_advance(&info->nitem, info->new_iter);
+    }
 
 	else if (info->new_iter->type != GIT_ITERATOR_TYPE_WORKDIR) {
+    fprintf(stderr, "handle_unmatched_new_item 13\n");
 		if (delta_type != GIT_DELTA_CONFLICTED)
 			delta_type = GIT_DELTA_ADDED;
 	}
 
 	else if (nitem->mode == GIT_FILEMODE_COMMIT) {
+    fprintf(stderr, "handle_unmatched_new_item 14\n");
 		/* ignore things that are not actual submodules */
 		if (git_submodule_lookup(NULL, info->repo, nitem->path) != 0) {
+      fprintf(stderr, "handle_unmatched_new_item 15\n");
 			git_error_clear();
 			delta_type = GIT_DELTA_IGNORED;
 
 			/* if this contains a tracked item, treat as normal TREE */
 			if (contains_oitem) {
+        fprintf(stderr, "handle_unmatched_new_item 16\n");
 				error = iterator_advance_into(&info->nitem, info->new_iter);
 				if (error != GIT_ENOTFOUND)
 					return error;
 
+        fprintf(stderr, "handle_unmatched_new_item 17\n");
 				git_error_clear();
 				return iterator_advance(&info->nitem, info->new_iter);
 			}
@@ -1093,6 +1123,7 @@ static int handle_unmatched_new_item(
 	}
 
 	else if (nitem->mode == GIT_FILEMODE_UNREADABLE) {
+    fprintf(stderr, "handle_unmatched_new_item 18\n");
 		if (DIFF_FLAG_IS_SET(diff, GIT_DIFF_INCLUDE_UNREADABLE_AS_UNTRACKED))
 			delta_type = GIT_DELTA_UNTRACKED;
 		else
@@ -1106,14 +1137,17 @@ static int handle_unmatched_new_item(
 		DIFF_FLAG_IS_SET(diff, GIT_DIFF_INCLUDE_TYPECHANGE_TREES) &&
 		contains_oitem)
 	{
+    fprintf(stderr, "handle_unmatched_new_item 19\n");
 		/* this entry was prefixed with a tree - make TYPECHANGE */
     delta_type = GIT_DELTA_TYPECHANGE;
 	}
 
+  fprintf(stderr, "handle_unmatched_new_item 20\n");
 	/* Actually create the record for this item if necessary */
 	if ((error = diff_delta__from_one(diff, delta_type, NULL, nitem)) != 0)
 		return error;
 
+  fprintf(stderr, "handle_unmatched_new_item 21\n");
 	return iterator_advance(&info->nitem, info->new_iter);
 }
 
