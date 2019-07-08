@@ -206,17 +206,27 @@ bool git_pathspec__match(
 	size_t pos;
 	struct pathspec_match_context ctxt;
 
+  fprintf(stderr, "git_pathspec__match 1 %s %d %d\n", path, disable_fnmatch, casefold);
+
 	if (matched_pathspec)
 		*matched_pathspec = NULL;
 	if (matched_at)
 		*matched_at = GIT_PATHSPEC_NOMATCH;
 
-	if (!vspec || !vspec->length)
+	if (!vspec || !vspec->length) {
+    fprintf(stderr, "git_pathspec__match 2 %s\n", path);
 		return true;
+  }
+
+  for (pos = 0; pos != vspec->length; ++pos) {
+    const git_attr_fnmatch *match = git_vector_get(vspec, pos);
+    fprintf(stderr, "git_pathspec__match 3 %s %s %d\n", match->pattern, match->containing_dir, match->flags);
+  }
 
 	pathspec_match_context_init(&ctxt, disable_fnmatch, casefold);
 
 	result = git_pathspec__match_at(&pos, vspec, &ctxt, path, NULL);
+  fprintf(stderr, "git_pathspec__match 4 %d %d\n", result, (int)pos);
 	if (result >= 0) {
 		if (matched_pathspec) {
 			const git_attr_fnmatch *match = git_vector_get(vspec, pos);

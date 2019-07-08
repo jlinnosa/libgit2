@@ -114,6 +114,8 @@ static bool diff_pathspec_match(
 	bool disable_pathspec_match =
 		DIFF_FLAG_IS_SET(diff, GIT_DIFF_DISABLE_PATHSPEC_MATCH);
 
+  fprintf(stderr, "diff_pathspec_match 1 %s %d\n", entry->path, disable_pathspec_match);
+
 	/* If we're disabling fnmatch, then the iterator has already applied
 	 * the filters to the files for us and we don't have to do anything.
 	 * However, this only applies to *files* - the iterator will include
@@ -123,9 +125,11 @@ static bool diff_pathspec_match(
 	if ((S_ISLNK(entry->mode) || S_ISREG(entry->mode)) &&
 		disable_pathspec_match) {
 		*matched_pathspec = entry->path;
+    fprintf(stderr, "diff_pathspec_match 2\n");
 		return true;
 	}
 
+  fprintf(stderr, "diff_pathspec_match 3\n");
 	return git_pathspec__match(
 		&diff->pathspec, entry->path, disable_pathspec_match,
 		DIFF_FLAG_IS_SET(diff, GIT_DIFF_IGNORE_CASE),
@@ -140,30 +144,46 @@ static bool diff_delta__test(
 {
 	const char *match;
 
-	if ((entry->flags & GIT_INDEX_ENTRY_VALID) != 0)
+  fprintf(stderr, "diff_delta__test 1 %s %d %d %d\n", entry->path, status, diff->base.opts.flags, diff->seen_delta_types);
+
+	if ((entry->flags & GIT_INDEX_ENTRY_VALID) != 0) {
+    fprintf(stderr, "diff_delta__test 2\n");
 		return false;
+  }
 
 	if ((diff->seen_delta_types & (1 << (status + 1))) &&
-		DIFF_FLAG_IS_SET(diff, GIT_DIFF_EXEMPLARS))
+		DIFF_FLAG_IS_SET(diff, GIT_DIFF_EXEMPLARS)) {
+      fprintf(stderr, "diff_delta__test 3\n");
 		return false;
+    }
 
 	if (status == GIT_DELTA_IGNORED &&
-		DIFF_FLAG_ISNT_SET(diff, GIT_DIFF_INCLUDE_IGNORED))
+		DIFF_FLAG_ISNT_SET(diff, GIT_DIFF_INCLUDE_IGNORED)) {
+      fprintf(stderr, "diff_delta__test 4\n");
 		return false;
+    }
 
 	if (status == GIT_DELTA_UNTRACKED &&
-		DIFF_FLAG_ISNT_SET(diff, GIT_DIFF_INCLUDE_UNTRACKED))
+		DIFF_FLAG_ISNT_SET(diff, GIT_DIFF_INCLUDE_UNTRACKED)) {
+      fprintf(stderr, "diff_delta__test 5\n");
 		return false;
+    }
 
 	if (status == GIT_DELTA_UNREADABLE &&
-		DIFF_FLAG_ISNT_SET(diff, GIT_DIFF_INCLUDE_UNREADABLE))
+		DIFF_FLAG_ISNT_SET(diff, GIT_DIFF_INCLUDE_UNREADABLE)) {
+      fprintf(stderr, "diff_delta__test 6\n");
 		return false;
+    }
 
-	if (!diff_pathspec_match(&match, diff, entry))
+	if (!diff_pathspec_match(&match, diff, entry)) {
+    fprintf(stderr, "diff_delta__test 7\n");
 		return false;
+  }
 
   if (matched_pathspec)
     *matched_pathspec = match;
+
+  fprintf(stderr, "diff_delta__test 8\n");
 
   return true;
 }
