@@ -7,11 +7,6 @@
 
 #include "iterator.h"
 
-#include <dirent.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
-
 #include "tree.h"
 #include "index.h"
 
@@ -1444,53 +1439,51 @@ static int filesystem_iterator_frame_push(
 		 * we have an index, we can just copy the data out of it.
 		 */
 
-    if (statbuf.st_mode == 0 &&
-        diriter.d_type == DT_DIR &&
-        !(error = filesystem_iterator_is_submodule(&submodule, iter, path, path_len)) &&
-        !submodule) {
-      // It's a directory, no need to lstat it.
-      statbuf.st_mode = S_IFDIR;
-    } else if (error < 0) {
-      goto done;
-    } else if (statbuf.st_mode == 0) {
-      if ((error = git_path_diriter_stat(&statbuf, &diriter)) < 0) {
-        /* file was removed between readdir and lstat */
-        if (error == GIT_ENOTFOUND) continue;
+		if ((error = git_path_diriter_stat(&statbuf, &diriter)) < 0) {
+			/* file was removed between readdir and lstat */
+			if (error == GIT_ENOTFOUND)
+				continue;
 
-        /* treat the file as unreadable */
-        memset(&statbuf, 0, sizeof(statbuf));
-        statbuf.st_mode = GIT_FILEMODE_UNREADABLE;
+			/* treat the file as unreadable */
+			memset(&statbuf, 0, sizeof(statbuf));
+			statbuf.st_mode = GIT_FILEMODE_UNREADABLE;
 
-        error = 0;
-      }
-      iter->base.stat_calls++;
+			error = 0;
+		}
 
-      /* Ignore wacky things in the filesystem */
-      if (!S_ISDIR(statbuf.st_mode) && !S_ISREG(statbuf.st_mode) && !S_ISLNK(statbuf.st_mode) &&
-          statbuf.st_mode != GIT_FILEMODE_UNREADABLE)
-        continue;
+		iter->base.stat_calls++;
 
-      /* Ensure that the pathlist entry lines up with what we expected */
-      if (dir_expected && !S_ISDIR(statbuf.st_mode)) continue;
+		/* Ignore wacky things in the filesystem */
+		if (!S_ISDIR(statbuf.st_mode) &&
+			!S_ISREG(statbuf.st_mode) &&
+			!S_ISLNK(statbuf.st_mode) &&
+			statbuf.st_mode != GIT_FILEMODE_UNREADABLE)
+			continue;
 
-      /* convert submodules to GITLINK and remove trailing slashes */
-      if (S_ISDIR(statbuf.st_mode)) {
-        if (!submodule) {
-          if ((error = filesystem_iterator_is_submodule(&submodule, iter, path, path_len)) < 0)
-            goto done;
-        }
-        if (submodule) statbuf.st_mode = GIT_FILEMODE_COMMIT;
-      }
-    }
+		if (filesystem_iterator_is_dot_git(iter, path, path_len))
+			continue;
 
-    if ((error = git_path_diriter_filename(&basename, &basename_len, &diriter)) < 0)
+		/* convert submodules to GITLINK and remove trailing slashes */
+		if (S_ISDIR(statbuf.st_mode)) {
+			bool submodule = false;
+
+			if ((error = filesystem_iterator_is_submodule(&submodule,
+					iter, path, path_len)) < 0)
+				goto done;
+
+			if (submodule)
+				statbuf.st_mode = GIT_FILEMODE_COMMIT;
+		}
+
+		/* Ensure that the pathlist entry lines up with what we expected */
+		else if (dir_expected)
+			continue;
+
+		if ((error = filesystem_iterator_entry_init(&entry,
+			iter, new_frame, path, path_len, &statbuf, pathlist_match)) < 0)
 			goto done;
 
-    if ((error = filesystem_iterator_entry_init(&entry, iter, new_frame, path, path_len,
-                                                basename_len, &statbuf, pathlist_match)) < 0)
-      goto done;
-
-    git_vector_insert(&new_frame->entries, entry);
+		git_vector_insert(&new_frame->entries, entry);
 	}
 
 	if (error == GIT_ITEROVER)
